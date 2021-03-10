@@ -1,11 +1,19 @@
 import React, { useState } from 'react';
-import { Image, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { Image, Platform, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import logo from './assets/logo.png';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
+import uploadToAnonymousFilesAsync from 'anonymous-files';
+import * as SplashScreen from 'expo-splash-screen';
+
+SplashScreen.preventAutoHideAsync();
+setTimeout(SplashScreen.hideAsync, 5000);
+// remove lines 7-11 when done testing splash screen
 
 export default function App() {
   const [selectedImage, setSelectedImage] = useState(null);
 
+// let's us use ImagePicker to select an image from a camera roll
   let openImagePickerAsync = async () => {
     let permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -19,10 +27,26 @@ export default function App() {
     if (pickerResult.cancelled === true) {
       return;
     }
-
-    setSelectedImage({ localUri: pickerResult.uri });
+// uploads and sets URI depending on web or other OS
+    if (Platform.OS === 'web') {
+      let remoteUri = await uploadToAnonymousFilesAsync(pickerResult.uri);
+      setSelectedImage({ localUri: pickerResult.uri, remoteUri });
+    } else {
+      setSelectedImage({ localUri: pickerResult.uri, remoteUri: null });
+    }
   }
 
+// let's user share selected image & show where's it available for sharing if sharing isn't available
+  let openShareDialogAsync = async () => {
+    if (!(await Sharing.isAvailableAsync())) {
+      alert(`The image is available for sharing at: ${selectedImage.remoteUri}`);
+      return;
+    }
+
+    await Sharing.shareAsync(selectedImage.localUri);
+  };
+
+// changes display when image is selected
   if (selectedImage !== null) {
     return (
       <View style={styles.container}>
@@ -30,10 +54,13 @@ export default function App() {
           source={{ uri: selectedImage.localUri }}
           style={styles.thumbnail}
         />
+        <TouchableOpacity onPress={openShareDialogAsync} style={styles.button}>
+          <Text style={styles.buttonText}>Share this photo</Text>
+        </TouchableOpacity>
       </View>
     );
   }
-
+// TouchableOpacity is a button that changes opacity on click
   return (
     <View style={styles.container}>
       <Image source={logo} style={styles.logo} />
@@ -80,8 +107,14 @@ const styles = StyleSheet.create({
     width: 300,
     height: 300,
     resizeMode: "contain"
-  }
+  },
+  splash: {
+  image: "./assets/splash.png",
+  resizeMode: "contain",
+  backgroundColor: "#000000"
+},
 });
 
+// may need to add quotes to everything in splash
 // alternative image path:
 // <Image source={{ uri: "https://i.imgur.com/TkIrScD.png" }} style={{ width: 305, height: 159 }} />
